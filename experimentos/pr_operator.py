@@ -24,6 +24,7 @@ class OT_draw_operator(Operator):
         self.draw_handle_3d = None
         self.draw_event = None
         self.mouse_vert = None
+        self.extruding = False
 
         self.vertices = []
         self.create_batch()
@@ -94,29 +95,33 @@ class OT_draw_operator(Operator):
         if event.type in {'ESC'}:
             print('al menos esc funciona')
             self.unregister_handlers(context)
+
             return {'CANCELLED'}
 
-        if event.type in {'MOUSEMOVE'}:
+        if event.type in {'MOUSEMOVE'} and not self.extruding:
 
             if len(self.vertices) > 0:
                 self.mouse_vert = self.get_mouse_3d_vertex(event, context)
                 self.create_batch()
 
         if event.value == "PRESS":
-            if event.type == "LEFTMOUSE":
+            if event.type == "LEFTMOUSE" and not self.extruding:
                 vertex = self.get_mouse_3d_vertex(event, context)
                 self.vertices.append(vertex)
                 self.create_batch()
 
-            if event.type == "RET":
-                print('hola en evento return')
-                self.create_object()
+            if event.type == "RET" and not self.extruding:
+                print('hola en evento return not extruding')
+                self.create_object(context)
+                return {'RUNNING_MODAL'}
+
+            if event.type == "RET" and self.extruding:
                 self.unregister_handlers(context)
                 return {'CANCELLED'}
 
         return {'PASS_THROUGH'}
 
-    def create_object(self):
+    def create_object(self, context):
         mesh = bpy.data.meshes.new('MY_MESH')
         obj = bpy.data.objects.new('obj', mesh)
 
@@ -137,10 +142,15 @@ class OT_draw_operator(Operator):
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.mesh.select_all(action='SELECT')
 
+        self.extruding = True
+        context.area.tag_redraw()
         bpy.ops.mesh.edge_face_add()
+        bpy.ops.mesh.extrude_region_move()
+        bpy.ops.transform.translate('INVOKE_DEFAULT', constraint_axis=(
+            False, False, True), constraint_orientation='NORMAL')
 
-        bpy.ops.object.mode_set(mode='OBJECT')
-        bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY')
+        # bpy.ops.object.mode_set(mode='OBJECT')
+        # bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY')
 
     def finish(self, context):
         self.unregister_handlers(context)
